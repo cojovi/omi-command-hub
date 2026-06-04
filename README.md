@@ -59,6 +59,16 @@ POST /omi/chat
 
 ## Omi Developer Settings
 
+**Setup Completed URL** (required if you configured this field in the Omi app — wrong URL causes “setup is completed” errors on Enable):
+
+```
+https://omi.cojovi.com/setup/status
+```
+
+Omi will call it as `GET .../setup/status?uid=YOUR_UID`. Response must be `{"is_setup_completed": true}`.
+
+Do **not** use `/health` for setup — it returns a different JSON shape.
+
 Point your Integration App webhooks to:
 
 ```

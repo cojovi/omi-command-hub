@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import admin, health, omi_tools, omi_webhooks
+from app.api import admin, health, omi_tools, omi_webhooks, setup
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger, get_request_id, new_request_id
 
@@ -49,6 +49,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(health.router)
+    app.include_router(setup.router)
     app.include_router(omi_webhooks.router)
     app.include_router(omi_tools.router)
     app.include_router(admin.router)
