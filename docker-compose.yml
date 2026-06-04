@@ -1,0 +1,86 @@
+services:
+  api:
+    build: .
+    container_name: omi_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "${API_PORT:-8000}:8000"
+
+  worker:
+    build: .
+    container_name: omi_worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: python -m app.workers.worker
+
+  postgres:
+    image: postgres:16
+    container_name: omi_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: omi_command_hub
+      POSTGRES_USER: omi_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U omi_user -d omi_command_hub"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: omi_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+  nginx:
+    image: nginx:latest
+    container_name: omi_nginx
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      # Not 80/443 — only 8080 on host for nginx-proxy → host:8080 → omi_nginx
+      - "${NGINX_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./nginx/omi.conf:/etc/nginx/conf.d/default.conf:ro
+
+  # Registers omi.cojovi.com with jwilder/nginx-proxy (same stack as OpenWebUI).
+  # Must use Docker's default bridge network (not a compose user network).
+  omi-bridge-proxy:
+    image: nginx:alpine
+    container_name: omi_bridge_proxy
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    network_mode: bridge
+    environment:
+      VIRTUAL_HOST: ${OMI_VIRTUAL_HOST:-omi.cojovi.com}
+      VIRTUAL_PORT: 80
+      LETSENCRYPT_HOST: ${OMI_VIRTUAL_HOST:-omi.cojovi.com}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:-you@cmacroofing.com}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./nginx/bridge-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  postgres_data:
+  redis_data:
